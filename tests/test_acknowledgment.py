@@ -1,3 +1,5 @@
+from io import BytesIO
+from pypdf import PdfReader
 
 import sys
 from pathlib import Path
@@ -21,4 +23,15 @@ def test_assamese_name_is_preserved_in_acknowledgment_pdf():
     pdf_bytes = generate_acknowledgment(cur, 1)
 
     assert pdf_bytes, "PDF should be generated"
-    assert name.encode("utf-8") in pdf_bytes
+
+    # Extract readable text from the generated PDF.
+    reader = PdfReader(BytesIO(pdf_bytes))
+    pdf_text = "\n".join(
+        page.extract_text() or ""
+        for page in reader.pages
+    )
+
+    # Check whether the original Assamese name appears in the PDF text.
+    assert name in pdf_text, (
+        f"Assamese name missing from PDF text: {pdf_text!r}"
+    )
