@@ -11,6 +11,7 @@ import os
 import io
 import csv
 import random
+from pathlib import Path
 import hashlib
 import configparser
 from datetime import datetime, date, timedelta
@@ -326,6 +327,9 @@ def handle_submission():
                     (mobile, hash_password(portal_pass)))
     conn.commit()
 
+
+    
+
     app.logger.info("generating acknowledgment pdf application=%d" % new_id)
     pdf_bytes = generate_acknowledgment(cur, new_id)
     ack_dir = os.path.join(UPLOAD_DIR, "ack")
@@ -342,39 +346,105 @@ def handle_submission():
     return render_template("confirmation.html", app_no=app_no, app_id=new_id)
 
 
+
 def generate_acknowledgment(cur, app_id):
-    cur.execute("SELECT application_no, applicant_name, mobile, dob, village, block, "
-                "bank_account, ifsc, submitted_at, status FROM applications WHERE id = %s",
-                (app_id,))
+    # Get application details from the database.
+    cur.execute(
+        "SELECT application_no, applicant_name, mobile, dob, village, block, "
+        "bank_account, ifsc, submitted_at, status "
+        "FROM applications WHERE id = %s",
+        (app_id,)
+    )
     row = cur.fetchone()
+
+    # Check if the application exists.
+    if not row:
+        raise ValueError("Application not found")
+
     pdf = FPDF()
+
+    # Load the font used for Assamese names.
+    font_path = (
+        Path(__file__).resolve().parent
+        / "fonts"
+        / "NotoSansBengali-Regular.ttf"
+    )
+
+    # Check if the font file exists.
+    if not font_path.is_file():
+        raise FileNotFoundError(f"Unicode font not found: {font_path}")
+
+    pdf.add_font("NotoUnicode", fname=str(font_path))
     pdf.add_page()
+
+    # Add the government heading.
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "GOVERNMENT OF PURVANCHAL", ln=1, align="C")
-    pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 8, "Department of Social Welfare", ln=1, align="C")
-    pdf.cell(0, 8, "Old Age Pension Scheme - Acknowledgment", ln=1, align="C")
+    pdf.cell(
+        0, 10, "GOVERNMENT OF PURVANCHAL",
+        new_x="LMARGIN", new_y="NEXT", align="C"
+    )
+
+    pdf.set_font("Helvetica", size=11)
+    pdf.cell(
+        0, 8, "Department of Social Welfare",
+        new_x="LMARGIN", new_y="NEXT", align="C"
+    )
+    pdf.cell(
+        0, 8, "Old Age Pension Scheme - Acknowledgment",
+        new_x="LMARGIN", new_y="NEXT", align="C"
+    )
+
     pdf.ln(4)
-    # decorative border, as per approved letterhead design
-    for i in range(0, 2000):
-        x = 10 + (i % 190)
+
+    # Draw the page border.
+    for i in range(190):
+        x = 10 + i
         pdf.line(x, 282, x + 0.5, 282)
         pdf.line(x, 12, x + 0.5, 12)
-    labels = ["Application No", "Applicant Name", "Mobile", "Date of Birth",
-              "Village", "Block", "Bank Account", "IFSC", "Submitted At", "Status"]
-    pdf.set_font("Helvetica", "", 10)
+
+    # Add labels for application details.
+    labels = [
+        "Application No",
+        "Applicant Name",
+        "Mobile",
+        "Date of Birth",
+        "Village",
+        "Block",
+        "Bank Account",
+        "IFSC",
+        "Submitted At",
+        "Status",
+    ]
+
+    # Add each label and its value to the PDF.
     for label, val in zip(labels, row):
-        try:
-            pdf.cell(60, 8, label, border=1)
-            pdf.cell(0, 8, str(val), border=1, ln=1)
-        except Exception:
-            pdf.cell(0, 8, "?", border=1, ln=1)
+        pdf.set_font("Helvetica", size=10)
+        pdf.cell(60, 8, label, border=1)
+
+        value = str(val) if val is not None else ""
+
+        # Use a Unicode font for names in other scripts.
+        if any(ord(char) > 127 for char in value):
+            pdf.set_font("NotoUnicode", size=10)
+        else:
+            pdf.set_font("Helvetica", size=10)
+
+        pdf.cell(
+            0, 8, value,
+            border=1, new_x="LMARGIN", new_y="NEXT"
+        )
+
+    # Add the acknowledgment note.
     pdf.ln(6)
     pdf.set_font("Helvetica", "I", 9)
-    pdf.multi_cell(0, 5, "This is a computer generated acknowledgment. Processing SLA "
-                         "as per the Purvanchal Right to Public Services Act applies.")
-    return bytes(pdf.output())
+    pdf.multi_cell(
+        0, 5,
+        "This is a computer generated acknowledgment. Processing SLA "
+        "as per the Purvanchal Right to Public Services Act applies."
+    )
 
+    # Return the generated PDF as bytes.
+    return bytes(pdf.output())
 
 # ---------------------------------------------------------------------------
 # Status portal (citizen login)
