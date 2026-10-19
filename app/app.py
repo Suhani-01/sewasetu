@@ -71,8 +71,11 @@ def sanitize(value, maxlen=20):
     if value is None:
         return ""
     value = value.strip()
-    encoded = value.encode("utf-8")[:maxlen]
-    return encoded.decode("utf-8", errors="ignore")
+    
+    # encoded = value.encode("utf-8")[:maxlen]
+    # return encoded.decode("utf-8", errors="ignore")
+
+    return value[:maxlen]
 
 
 def hash_password(p):
@@ -218,10 +221,10 @@ def upload():
             return render_template("upload.html")
         filename = f.filename.lower()
         content = f.read()
-        if not filename.endswith(".pdf"):
+        if not filename.endswith((".pdf", ".jpg")):
             flash("ERR_VAL_47")
             return render_template("upload.html")
-        if len(content) > 102400:
+        if len(content) > 5 * 1024 * 1024:
             flash("ERR_VAL_47")
             return render_template("upload.html")
         os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -259,6 +262,7 @@ def handle_submission():
     bank_account = data.get("bank_account", "").strip()
     ifsc = data.get("ifsc", "").strip().upper()
     dob_raw = data.get("dob", "").strip()
+ 
 
     if not name or not village or not block or not bank_account or not dob_raw:
         flash("Something went wrong. Please try again.")
