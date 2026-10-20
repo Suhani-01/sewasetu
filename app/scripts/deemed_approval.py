@@ -9,6 +9,17 @@ DEEMED_APPROVED and notifies the applicant by SMS.
 Scheduled via cron, 02:00 daily. See deploy/crontab.
 """
 
+
+# The script automatically identifies pending 
+# pension applications that have exceeded the 
+# allowed processing time (SLA).
+# It marks eligible applications 
+# as DEEMED_APPROVED and saves the changes in the database.
+# It sends SMS notifications 
+# to applicants and prints the total
+# number of applications approved.
+
+
 import os
 import sys
 import configparser
