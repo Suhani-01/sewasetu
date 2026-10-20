@@ -510,6 +510,118 @@ def ack_pdf(app_id):
     return send_file(path, mimetype="application/pdf")
 
 
+# To get edit application page route and to commit the changes
+@app.route("/application/<int:app_id>/edit", methods=["GET", "POST"])
+def edit_application(app_id):
+    # Only a logged-in citizen can edit their application.
+    if not session.get("logged_in") or not session.get("portal_mobile"):
+        flash("Please login to edit your application.")
+        return redirect(url_for("status_login"))
+
+    mobile = session["portal_mobile"]
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Fetch the application belonging to this citizen.
+    cur.execute(
+        "SELECT id, application_no, applicant_name, mobile, dob, "
+        "village, block, bank_account, ifsc, status "
+        "FROM applications WHERE id = %s AND mobile = %s",
+        (app_id, mobile)
+    )
+    row = cur.fetchone()
+
+    if not row:
+        cur.close()
+        conn.close()
+        abort(404)
+
+    # Only pending applications can be edited.
+    if row[9] != "PENDING":
+        cur.close()
+        conn.close()
+        flash("Only pending applications can be edited.")
+        return redirect(url_for("view_application", app_id=app_id))
+
+    if request.method == "POST":
+        name = sanitize(request.form.get("applicant_name", "").strip())
+        dob_raw = request.form.get("dob", "").strip()
+        village = request.form.get("village", "").strip()
+        block = request.form.get("block", "").strip()
+        bank_account = request.form.get("bank_account", "").strip()
+        ifsc = request.form.get("ifsc", "").strip().upper()
+
+        # Check that all required fields are filled.
+        if not all([name, dob_raw, village, block, bank_account, ifsc]):
+            flash("Please fill in all required fields.")
+            cur.close()
+            conn.close()
+            return redirect(url_for("edit_application", app_id=app_id))
+
+        # Validate the date of birth.
+        try:
+            dob = datetime.strptime(dob_raw, "%Y-%m-%d").date()
+        except ValueError:
+            flash("Please enter a valid date of birth.")
+            cur.close()
+            conn.close()
+            return redirect(url_for("edit_application", app_id=app_id))
+
+        # Check the applicant's age.
+        today = date.today()
+        age = today.year - dob.year - (
+            (today.month, today.day) < (dob.month, dob.day)
+        )
+
+        if dob > today or age < MIN_AGE:
+            flash("Applicant does not meet the age requirement.")
+            cur.close()
+            conn.close()
+            return redirect(url_for("edit_application", app_id=app_id))
+
+        # Update the existing application, not create a new one.
+        cur.execute(
+            """UPDATE applications
+               SET applicant_name = %s,
+                   dob = %s,
+                   village = %s,
+                   block = %s,
+                   bank_account = %s,
+                   ifsc = %s
+               WHERE id = %s
+                 AND mobile = %s
+                 AND status = 'PENDING'""",
+            (
+                name, dob, village, block,
+                bank_account, ifsc, app_id, mobile
+            )
+        )
+
+        if cur.rowcount != 1:
+            conn.rollback()
+            cur.close()
+            conn.close()
+            flash("Application could not be updated.")
+            return redirect(url_for("view_application", app_id=app_id))
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        # Remove the old acknowledgment so it can be regenerated.
+        ack_path = os.path.join(UPLOAD_DIR, "ack", f"{app_id}.pdf")
+        if os.path.exists(ack_path):
+            os.remove(ack_path)
+
+        flash("Application updated successfully.","success")
+        return redirect(url_for("view_application", app_id=app_id))
+
+    cur.close()
+    conn.close()
+    return render_template("edit_application.html", a=row, app_id=app_id)
+
+
 @app.route("/status/reset", methods=["GET", "POST"])
 def reset_password():
     if request.method == "POST":

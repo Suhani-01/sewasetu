@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Edit Application</h2>
+
+<p>Application No: <b>{{ a[1] }}</b></p>
+
+<form method="POST" action="/application/{{ app_id }}/edit">
+
+  <label>Applicant Name</label>
+  <input type="text" name="applicant_name" value="{{ a[2] }}" required>
+
+  <label>Mobile Number</label>
+  <input type="tel" name="mobile" value="{{ a[3] }}" required readonly>
+
+  <label>Date of Birth</label>
+  <input type="date" name="dob" value="{{ a[4] }}" required>
+
+  <label>Village</label>
+  <input type="text" name="village" value="{{ a[5] }}" required>
+
+  <label>Block</label>
+  <input type="text" name="block" value="{{ a[6] }}" required>
+
+  <label>Bank Account Number</label>
+  <input type="text" name="bank_account" value="{{ a[7] }}" required>
+
+  <label>IFSC Code</label>
+  <input type="text" name="ifsc" value="{{ a[8] }}" required>
+
+  <button type="submit" class="btn">Save Changes</button>
+
+  <a href="/application/{{ app_id }}">Cancel</a>
+
+</form>
+{% endblock %}
