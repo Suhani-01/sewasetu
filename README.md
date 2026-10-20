@@ -17,3 +17,22 @@ docker compose up --build
 Production server logs (Jan–Jun 2026) are provided in `logs/`.
 
 Listen to `dc-briefing.mp3` first (the DC's briefing), then read `BRIEF.md`.
+
+
+
+
+
+The things i did for issue after holi :
+1. Extract archieve log from logs/sewaset-logs........
+this file contains : ._README.txt
+    README.txt
+    ._cron.log
+    cron.log ( we need this )
+    ._nginx-access.log.gz
+    nginx-access.log.gz
+    ._sewasetu-app.log.gz
+    sewasetu-app.log.gz
+
+command on terminal :
+  New-Item -ItemType Directory -Force logs\extracted
+  tar -xzf logs/sewasetu-logs-jan-jun-2026.tar.gz -C logs\extracted
